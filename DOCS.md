@@ -57,8 +57,6 @@ class BackendModule(Module):
 BackendModule()
 ```
 
----
-
 ## Core Concepts & Decorators
 
 The build graph is constructed using 3 decorators. These define how tasks are ran, trakced and cached.
@@ -115,8 +113,6 @@ Because `@task` return values are cached to disk as JSON metadata, `rnts` must s
 - Paths: `pathlib.Path` objects are converted to dictionary representations
 - `PathRef`: If you need to detect changes tracking for a path, wrap it in the `PathRef` model provided in `models.py`.
 
----
-
 ## CLI Execution
 
 To run a command, use the `rnts` CLI format from your terminal:
@@ -140,5 +136,5 @@ RNTS uses two locking mechanisms:
 1. Process Lock: On startup, it makes a file named `.rnts.lock` in the `out/` directory. If another `rnts` instance 
 detects this, it immediately exits. You may delete `.rnts.lock` if you are absolutely sure that another instance
 is not running.
-2. FileLocks: Individual hash files and metadata JSON files are locked during read/write operations to ensure 
+2. `FileLock`s: Individual hash files and metadata JSON files are locked during read/write operations to ensure 
 thread-safety when using `rnts.gather()`.
