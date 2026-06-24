@@ -107,11 +107,10 @@ and runs them concurrently in a `ThreadPoolExecutor` sized to the host's CPU cor
 
 ## Type Serialization (`models.py` & Internals)
 
-Because `@task` return values are cached to disk as JSON metadata, `rnts` must serialize and deserialize complex Python objects.
+Because `@task` return values are cached to disk as JSON metadata, `rnts` needs to serialize and deserialize Python objects.
 
-- Supported Types: `rnts` recursively handles `list`, `tuple`, and `dict`.
-- Paths: `pathlib.Path` objects are converted to dictionary representations
-- `PathRef`: If you need to detect changes tracking for a path, wrap it in the `PathRef` model provided in `models.py`.
+`rnts` uses `dill`, which means it can serialize most Python types. Read [this](https://pypi.org/project/dill/)
+to see what types are supported.
 
 ## CLI Execution
 
@@ -119,7 +118,6 @@ To run a command, use the `rnts` CLI format from your terminal:
 
 ```bash
 rnts <module_name>.<command_name>
-
 ```
 
 For the example configuration provided above, you would run:
