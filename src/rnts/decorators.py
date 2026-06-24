@@ -18,10 +18,12 @@ import json
 from pathlib import Path
 import threading
 from typing import Callable, TypeVar, ParamSpec, Concatenate, cast
-from filelock import FileLock  # Added for cross-thread/process file locking
+from filelock import FileLock
+import dill  # pyright: ignore[reportMissingTypeStubs]
+import base64
 
 from .context import ctx
-from .models import Module, PathRef
+from .models import Module
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -71,51 +73,15 @@ def _compute_dir_hash(directory: Path) -> str:
     return hasher.hexdigest()
 
 
-def _serialize_val(val: object) -> object:
-    # convert pathref objects to typed dictionaries
-    if isinstance(val, PathRef):
-        return {"__type__": "PathRef", "path": str(val.path)}
-    # convert path objects to typed dictionaries
-    if isinstance(val, Path):
-        return {"__type__": "Path", "path": str(val)}
-    # recursively serialize list elements
-    if isinstance(val, list):
-        return [_serialize_val(v) for v in cast(list[object], val)]
-    # convert tuples to typed dictionaries with serialized items
-    if isinstance(val, tuple):
-        return {
-            "__type__": "tuple",
-            "items": [_serialize_val(v) for v in cast(tuple[object, ...], val)],
-        }
-    # recursively serialize dictionary keys and values
-    if isinstance(val, dict):
-        return {
-            str(k): _serialize_val(v)
-            for k, v in cast(dict[object, object], val).items()
-        }
-    return val
+def _serialize_val(val: object) -> str:
+    binary_data = dill.dumps(val)  # pyright: ignore[reportUnknownMemberType]
+    return base64.b64encode(binary_data).decode("utf-8")
 
 
 def _deserialize_val(val: object) -> object:
-    if isinstance(val, dict):
-        d = cast(dict[str, object], val)
-        t = d.get("__type__")
-        # reconstruct pathref from metadata dict
-        if t == "PathRef":
-            return PathRef(str(d.get("path", "")))
-        # reconstruct path from metadata dict
-        if t == "Path":
-            return Path(str(d.get("path", "")))
-        # reconstruct tuple from item list
-        if t == "tuple":
-            items = d.get("items")
-            if isinstance(items, list):
-                return tuple(_deserialize_val(v) for v in cast(list[object], items))
-        # recursively deserialize plain dictionary values
-        return {str(k): _deserialize_val(v) for k, v in d.items()}
-    # recursively deserialize list elements
-    if isinstance(val, list):
-        return [_deserialize_val(v) for v in cast(list[object], val)]
+    if isinstance(val, str):
+        binary_data = base64.b64decode(val.encode("utf-8"))
+        return cast(object, dill.loads(binary_data))  # pyright: ignore[reportUnknownMemberType]
     return val
 
 
@@ -140,10 +106,6 @@ class CacheManager:
         )
 
     def check_cache_validity(self) -> tuple[bool, object | None]:
-        """
-        Verifies if the cache metadata file exists and all dependencies are valid.
-        Returns a tuple of (is_valid, serialized_return_value).
-        """
         if not self.meta_file.exists():
             return False, None
 
@@ -165,7 +127,6 @@ class CacheManager:
                             if not mod:
                                 return False, None
 
-                            # recalculate current hash state on disk
                             cast(Callable[[], None], getattr(mod, str(src_name)))()
 
                             curr_hash_file = (
@@ -207,6 +168,7 @@ class CacheManager:
                                 Callable[[], object], getattr(mod, str(dep_task_name))
                             )
                             curr_val = curr_task()
+
                             if _serialize_val(curr_val) != expected_val_serialized:
                                 return False, None
                         else:
@@ -218,7 +180,6 @@ class CacheManager:
             return False, None
 
     def write_cache(self, result: object) -> object:
-        """Serializes the result, persists the metadata JSON onto the disk, and returns the serialized result."""
         deps = ctx.get_dependencies(self.module_name, self.func_name)
         serialized_res = _serialize_val(result)
         meta_data = {
