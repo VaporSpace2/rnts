@@ -261,7 +261,9 @@ def task(func: Callable[Concatenate[M, P], R]) -> Callable[Concatenate[M, P], R]
             return cast(R, cached_res)
 
         # notify task start in terminal
-        print(f"\033[94m[RNTS] Running this: {self.module_name}.{func.__name__}...\033[0m")
+        print(
+            f"\033[94m[RNTS] Running this: {self.module_name}.{func.__name__}...\033[0m"
+        )
 
         # setup string buffers for current thread context
         stdout_buf = io.StringIO()
