@@ -59,7 +59,7 @@ class CProjectBuilder(Module):
 # instantiate to register with the CLI runner
 CProjectBuilder()
 
-# run `rnts frontend.build_all` to execute
+# run `rnts game_engine.build_all` to execute
 ```
 
 ## Installing
